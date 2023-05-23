@@ -24,7 +24,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/keybase/go-keychain"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // getCmd represents the get command
@@ -38,7 +40,30 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("get called")
+		var (
+			domain = "default"
+		)
+		if len(args) >= 1 && args[0] != "" {
+			domain = args[0]
+		}
+		accessGroup := viper.GetString("access_group")
+		query := keychain.NewItem()
+		query.SetSecClass(keychain.SecClassInternetPassword)
+		query.SetService(domain)
+		query.SetAccessGroup(accessGroup)
+		query.SetMatchLimit(keychain.MatchLimitOne)
+		query.SetReturnData(true)
+		query.SetReturnData(true)
+		results, err := keychain.QueryItem(query)
+		if err != nil {
+			// Error
+			fmt.Printf("failed to get data for doamin <%s> error <%s>\n", domain, err.Error())
+		} else if len(results) != 1 {
+			// Not found
+			fmt.Println("Not foun")
+		} else {
+			fmt.Printf("username = %s password = %s", string(results[0].Account), string(results[0].Data))
+		}
 	},
 }
 

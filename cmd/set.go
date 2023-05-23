@@ -24,7 +24,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/keybase/go-keychain"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // setCmd represents the set command
@@ -38,7 +40,32 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("set called")
+		var (
+			domain   = "default"
+			username string
+			password string
+		)
+		if len(args) >= 1 && args[0] != "" {
+			domain = args[0]
+		}
+		accessGroup := viper.GetString("access_group")
+		username, _ = cmd.Flags().GetString("username")
+		password, _ = cmd.Flags().GetString("password")
+
+		item := keychain.NewItem()
+		item.SetSecClass(keychain.SecClassInternetPassword)
+		item.SetService(domain)
+		item.SetAccount(username)
+		item.SetAccessGroup(accessGroup)
+		item.SetData([]byte(password))
+		item.SetSynchronizable(keychain.SynchronizableNo)
+		item.SetAccessible(keychain.AccessibleWhenUnlocked)
+		err := keychain.AddItem(item)
+		if err != nil {
+			fmt.Printf("failed to set data for doamin <%s> error <%s>\n", domain, err.Error())
+		} else {
+			fmt.Printf("Your information for domain <%s> has been successfully saved\n", domain)
+		}
 	},
 }
 
@@ -54,4 +81,6 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// setCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	setCmd.PersistentFlags().StringP("username", "u", "", "username for domain")
+	setCmd.PersistentFlags().StringP("password", "p", "", "password for domain")
 }
