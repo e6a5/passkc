@@ -23,22 +23,64 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"syscall"
 
+	"github.com/keybase/go-keychain"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // modifyCmd represents the modify command
 var modifyCmd = &cobra.Command{
 	Use:   "modify",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Modify username and/or password for a domain in the Keychain.",
+	Long:  `The hiepass modify command allows you to update the username and/or password for a specific domain in the Keychain on macOS.`,
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("modify called")
+		service := args[0]
+		account := ""
+		if len(args) > 1 {
+			account = args[1]
+		}
+		accounts, err := keychain.GetAccountsForService(service)
+		if err != nil {
+			fmt.Printf("Failed to get data for <%s>.\n Error: <%s>.\n", service, err.Error())
+			os.Exit(0)
+		}
+		if len(accounts) > 1 {
+			fmt.Printf("Too many accounts for <%s>.\n", service)
+			os.Exit(0)
+		}
+		if len(accounts) == 0 {
+			fmt.Printf("No information for service <%s>.\n", service)
+			os.Exit(0)
+		}
+		if len(accounts) == 1 && account == "" {
+			account = accounts[0]
+		}
+		oldLabel := getLabel(service, accounts[0])
+		newLabel := getLabel(service, account)
+		fmt.Print("Enter password: ")
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+		queryItem := keychain.NewGenericPassword(service, accounts[0], oldLabel, []byte{}, "")
+		updateItem := keychain.NewItem()
+		updateItem.SetSecClass(keychain.SecClassGenericPassword)
+		updateItem.SetService(service)
+		updateItem.SetAccount(account)
+		updateItem.SetLabel(newLabel)
+		updateItem.SetData(bytePassword)
+		err = keychain.UpdateItem(queryItem, updateItem)
+		if err != nil {
+			fmt.Printf("Failed to modify data for <%s>.\n Error: <%s>\n", service, err.Error())
+			return
+		}
+		fmt.Println("Updated successfully")
+
 	},
 }
 

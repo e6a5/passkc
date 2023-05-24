@@ -23,42 +23,43 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"syscall"
 
 	"github.com/keybase/go-keychain"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // setCmd represents the set command
 var setCmd = &cobra.Command{
 	Use:   "set",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Store username and password for a domain in the Keychain",
+	Long:  `The hiepass set command allows you to securely store the username and password for a specific domain in the Keychain on macOS.`,
+	Args:  cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
 		var (
-			domain   = "default"
+			service  string
 			username string
-			password string
 		)
-		if len(args) >= 1 && args[0] != "" {
-			domain = args[0]
-		}
-		accessGroup := viper.GetString("access_group")
-		username, _ = cmd.Flags().GetString("username")
-		password, _ = cmd.Flags().GetString("password")
+		service = args[0]
+		username = args[1]
+		label := getLabel(service, username)
 
-		item := keychain.NewGenericPassword(domain, username, "label test", []byte(password), accessGroup)
-		err := keychain.AddItem(item)
+		fmt.Print("Enter password: ")
+		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
 		if err != nil {
-			fmt.Printf("failed to set data for doamin <%s> error <%s>\n", domain, err.Error())
-		} else {
-			fmt.Printf("Your information for domain <%s> has been successfully saved\n", domain)
+			fmt.Println("Error:", err)
+			os.Exit(0)
 		}
+
+		item := keychain.NewGenericPassword(service, username, label, bytePassword, "")
+		err = keychain.AddItem(item)
+		if err != nil {
+			fmt.Printf("Failed to set data for <%s>.\n Error: <%s>\n", service, err.Error())
+			os.Exit(0)
+		}
+		fmt.Println("Saved successfully")
 	},
 }
 
@@ -74,6 +75,4 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// setCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	setCmd.PersistentFlags().StringP("username", "u", "", "username for domain")
-	setCmd.PersistentFlags().StringP("password", "p", "", "password for domain")
 }

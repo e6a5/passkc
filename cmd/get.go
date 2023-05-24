@@ -23,38 +23,41 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/keybase/go-keychain"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"golang.design/x/clipboard"
 )
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
 	Use:   "get",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Retrieve username and password for a domain from the Keychain.",
+	Long:  `The hiepass get command retrieves the stored username and password for a specific domain`,
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var service string
-		if len(args) >= 1 && args[0] != "" {
-			service = args[0]
-		}
+		service := args[0]
 		accounts, err := keychain.GetAccountsForService(service)
 		if err != nil {
-			// Error
-			fmt.Printf("failed to get data for service <%s> error <%s>\n", service, err.Error())
-			return
+			fmt.Printf("Failed to get data for <%s>.\n Error: <%s>.\n", service, err.Error())
+			os.Exit(0)
 		}
-		for _, account := range accounts {
-			accessGroup := viper.GetString("access_group")
-			password, _ := keychain.GetGenericPassword(service, account, "label test", accessGroup)
-			fmt.Println(string(password))
+		if len(accounts) > 1 {
+			fmt.Printf("Too many accounts for <%s>.\n", service)
+			os.Exit(0)
 		}
+		if len(accounts) == 1 {
+			label := getLabel(service, accounts[0])
+			password, err := keychain.GetGenericPassword(service, accounts[0], label, "")
+			if err == nil {
+				clipboard.Init()
+				clipboard.Write(clipboard.FmtText, password)
+				fmt.Printf("Copied password for account <%s> in service <%s> to clipboard.\n", accounts[0], service)
+				return
+			}
+		}
+		fmt.Printf("No information for service <%s>.\n", service)
 	},
 }
 
