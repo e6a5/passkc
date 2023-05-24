@@ -32,14 +32,9 @@ import (
 // removeCmd represents the remove command
 var removeCmd = &cobra.Command{
 	Use:   "remove",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Args: cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+	Short: "Remove a domain and its associated credentials from the Keychain.",
+	Long:  `The hiepass remove command allows you to securely delete a specific domain and its associated username and password from the Keychain on macOS.`,
+	Args:  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
 		service := args[0]
 		accounts, err := keychain.GetAccountsForService(service)
