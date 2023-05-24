@@ -52,14 +52,7 @@ to quickly create a Cobra application.`,
 		username, _ = cmd.Flags().GetString("username")
 		password, _ = cmd.Flags().GetString("password")
 
-		item := keychain.NewItem()
-		item.SetSecClass(keychain.SecClassInternetPassword)
-		item.SetService(domain)
-		item.SetAccount(username)
-		item.SetAccessGroup(accessGroup)
-		item.SetData([]byte(password))
-		item.SetSynchronizable(keychain.SynchronizableNo)
-		item.SetAccessible(keychain.AccessibleWhenUnlocked)
+		item := keychain.NewGenericPassword(domain, username, "label test", []byte(password), accessGroup)
 		err := keychain.AddItem(item)
 		if err != nil {
 			fmt.Printf("failed to set data for doamin <%s> error <%s>\n", domain, err.Error())
