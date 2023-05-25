@@ -1,60 +1,71 @@
-# hiepass
+# passkc
 
-**hiepass** is a command-line interface (CLI) tool for storing and retrieving username-password information from the Keychain on macOS. It provides a convenient way to securely manage and access credentials for various domains.
+**passkc** is a command-line interface (CLI) tool for storing and retrieving username-password information from the Keychain on macOS. It provides a convenient way to securely manage and access credentials for various domains.
 
 ## Installation
 
 ## Usage
 
-hiepass supports the following commands:
+passkc supports the following commands:
+
+- **Show**: Show list of labels.
+
+```bash
+  passkc show
+
+```
 
 - **Set**: Store a username for a domain in the Keychain.
 
 ```bash
-  hiepass set <domain> <username>
+  passkc set <domain> <username>
 
 ```
 - **Get**: Retrieve the stored username for a domain from the Keychain.
 
 ```bash 
-hiepass get <domain>
+passkc get <domain>
 ```
 
 - **Modify**: Update the username for a domain in the Keychain (optional: include a new username).
 
 ```bash
-hiepass modify <domain> <new_username>
+passkc modify <domain> <new_username>
 ```
 
 - **Remove**: Remove a domain and its associated credentials from the Keychain.
 
 ```bash
-hiepass remove <domain>
+passkc remove <domain>
 ```
 
-Make sure to replace <domain> and <username> with the specific domain and username you want to store, retrieve, modify, or remove in the Keychain.
+Make sure to replace `<domain>` and `<username>` with the specific domain and username you want to store, retrieve, modify, or remove in the Keychain.
 
 ## Examples
 
 ```bash
 # set new domain's information
-> hiepass set google.com e6a5
+> passkc set google.com e6a5
 Enter password: 
 Saved successfully 
 
 # retrieve data 
->hiepass get google.com
+>passkc get google.com
 Copied password for account <e6a5> in service <google.com> to clipboard.
 
 # modify information
-> hiepass modify google.com tranhiep
+> passkc modify google.com tranhiep
 Enter password: 
 Updated successfully
 
 # remove domain's information
-> hiepass remove google.com
+> passkc remove google.com
 Removed successfully
 
+# show list of labels
+> passkc show
+List of labels:
+com.passkc.google.com.e6a5 #<app_prefix>.<domain>.<username>
 ```
 
 ## Contributing

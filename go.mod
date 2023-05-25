@@ -1,4 +1,4 @@
-module github.com/e6a5/hiepass
+module github.com/e6a5/passkc
 
 go 1.19
 

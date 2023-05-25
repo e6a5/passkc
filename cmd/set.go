@@ -22,44 +22,18 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-	"os"
-	"syscall"
-
-	"github.com/keybase/go-keychain"
+	"github.com/e6a5/passkc/kc"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 // setCmd represents the set command
 var setCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Store username and password for a domain in the Keychain",
-	Long:  `The hiepass set command allows you to securely store the username and password for a specific domain in the Keychain on macOS.`,
+	Long:  `The passkc set command allows you to securely store the username and password for a specific domain in the Keychain on macOS.`,
 	Args:  cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
 	Run: func(cmd *cobra.Command, args []string) {
-		var (
-			service  string
-			username string
-		)
-		service = args[0]
-		username = args[1]
-		label := getLabel(service, username)
-
-		fmt.Print("Enter password: ")
-		bytePassword, err := terminal.ReadPassword(int(syscall.Stdin))
-		if err != nil {
-			fmt.Println("Error:", err)
-			os.Exit(0)
-		}
-
-		item := keychain.NewGenericPassword(service, username, label, bytePassword, "")
-		err = keychain.AddItem(item)
-		if err != nil {
-			fmt.Printf("Failed to set data for <%s>.\n Error: <%s>\n", service, err.Error())
-			os.Exit(0)
-		}
-		fmt.Println("Saved successfully")
+		kc.SetData(args[0], args[1])
 	},
 }
 

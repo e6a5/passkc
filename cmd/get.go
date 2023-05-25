@@ -22,42 +22,18 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/keybase/go-keychain"
+	"github.com/e6a5/passkc/kc"
 	"github.com/spf13/cobra"
-	"golang.design/x/clipboard"
 )
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Retrieve username and password for a domain from the Keychain.",
-	Long:  `The hiepass get command retrieves the stored username and password for a specific domain`,
+	Long:  `The passkc get command retrieves the stored username and password for a specific domain`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		service := args[0]
-		accounts, err := keychain.GetAccountsForService(service)
-		if err != nil {
-			fmt.Printf("Failed to get data for <%s>.\n Error: <%s>.\n", service, err.Error())
-			os.Exit(0)
-		}
-		if len(accounts) > 1 {
-			fmt.Printf("Too many accounts for <%s>.\n", service)
-			os.Exit(0)
-		}
-		if len(accounts) == 1 {
-			label := getLabel(service, accounts[0])
-			password, err := keychain.GetGenericPassword(service, accounts[0], label, "")
-			if err == nil {
-				clipboard.Init()
-				clipboard.Write(clipboard.FmtText, password)
-				fmt.Printf("Copied password for account <%s> in service <%s> to clipboard.\n", accounts[0], service)
-				return
-			}
-		}
-		fmt.Printf("No information for service <%s>.\n", service)
+		kc.GetData(args[0])
 	},
 }
 

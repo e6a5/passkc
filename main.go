@@ -21,7 +21,7 @@ THE SOFTWARE.
 */
 package main
 
-import "github.com/e6a5/hiepass/cmd"
+import "github.com/e6a5/passkc/cmd"
 
 func main() {
 	cmd.Execute()
