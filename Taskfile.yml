@@ -26,12 +26,6 @@ tasks:
     env:
       VERSION: dev
 
-  build:name:linux-amd64:
-    cmds:
-      - echo "passkc-$VERSION-linux-amd64"
-    env:
-      VERSION: dev
-
   checksum:upload:
     cmds:
       - gh release upload $VERSION ./checksum-{{.BUILD_NAME}}.txt
