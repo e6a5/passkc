@@ -1,0 +1,57 @@
+version: "3"
+
+tasks:
+  build:
+    cmds:
+      - >
+        go build -v -trimpath 
+        --ldflags "-X main.version=$VERSION" 
+        -o {{.BUILD_NAME}}
+    env:
+      VERSION: dev
+      OS: "{{OS}}"
+      ARCH: "{{ARCH}}"
+      CGO_ENABLED: 1
+    vars:
+      BUILD_NAME:
+        sh: task build:name
+
+  build:name:
+    cmds:
+      - task: "build:name:{{OS}}-{{ARCH}}"
+
+  build:name:darwin-amd64:
+    cmds:
+      - echo "passkc-$VERSION-darwin-amd64"
+    env:
+      VERSION: dev
+
+  build:name:linux-amd64:
+    cmds:
+      - echo "passkc-$VERSION-linux-amd64"
+    env:
+      VERSION: dev
+
+  checksum:upload:
+    cmds:
+      - gh release upload $VERSION ./checksum-{{.BUILD_NAME}}.txt
+    env:
+      VERSION: dev
+    vars:
+      BUILD_NAME:
+        sh: task build:name
+    preconditions:
+      - sh: "[ -n \"$GITHUB_TOKEN\" ]"
+        msg: "GITHUB_TOKEN must be set"
+
+  release:upload:
+    cmds:
+      - gh release upload $VERSION ./{{.BUILD_NAME}}
+    env:
+      VERSION: dev
+    vars:
+      BUILD_NAME:
+        sh: task build:name
+    preconditions:
+      - sh: "[ -n \"$GITHUB_TOKEN\" ]"
+        msg: "GITHUB_TOKEN must be set"

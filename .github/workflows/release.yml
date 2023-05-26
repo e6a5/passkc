@@ -1,0 +1,73 @@
+name: build release artefacts
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-20.04
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: get tag annotation
+        run: echo "::set-output name=content::$(git tag --format='%(contents)' -n2 ${{ github.ref }})"
+        id: notes
+
+      - name: check for prerelease
+        # NOTE: if tag contains a - is a semver prerelease
+        run: echo "::set-output name=flag::$(grep '-' ${{github.ref}} && echo --prerelease)"
+        id: prerelease
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=version::$(echo ${{ github.ref }} | cut -d / -f 3)
+
+      - name: create release
+        run: gh release create ${{ steps.get_version.outputs.version }} --draft --title ${{ steps.get_version.outputs.version }} ${{steps.prerelease.outputs.flag}} --notes '${{ steps.notes.outputs.content }}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    needs: create-release
+    strategy:
+      matrix:
+        # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources
+        operating-system: [ubuntu-20.04, windows-2019, macos-11]
+    runs-on: ${{ matrix.operating-system }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: endorama/asdf-parse-tool-versions@v1
+        id: versions
+
+      - name: Install Task
+        uses: arduino/setup-task@v1
+        with:
+          version: "${{ env.TASK_VERSION }}"
+
+      - name: install Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: "${{ env.GOLANG_VERSION }}"
+
+      - name: Build the CLI
+        run: task build
+        env:
+          VERSION: ${{ needs.create-release.outputs.version }}
+
+      - run: task build:name
+
+      - name: upload to release
+        run: task release:upload
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.create-release.outputs.version }}
