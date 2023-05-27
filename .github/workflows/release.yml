@@ -68,6 +68,8 @@ jobs:
 
       - name: archive build
         run: task archives
+        env:
+          VERSION: ${{ needs.create-release.outputs.version }}
 
       - name: upload to release
         run: task release:upload
