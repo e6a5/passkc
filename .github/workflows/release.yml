@@ -66,6 +66,9 @@ jobs:
 
       - run: task build:name
 
+      - name: archive build
+        run: task archives
+
       - name: upload to release
         run: task release:upload
         env:

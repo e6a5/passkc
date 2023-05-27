@@ -38,9 +38,18 @@ tasks:
       - sh: "[ -n \"$GITHUB_TOKEN\" ]"
         msg: "GITHUB_TOKEN must be set"
 
+  archives:
+    cmds:
+      - tar -cvzf {{.BUILD_NAME}}.tar.gz ./{{.BUILD_NAME}}
+    env:
+      VERSION: dev
+    vars:
+      BUILD_NAME:
+        sh: task build:name
+
   release:upload:
     cmds:
-      - gh release upload $VERSION ./{{.BUILD_NAME}}
+      - gh release upload $VERSION ./{{.BUILD_NAME}}.tar.gz
     env:
       VERSION: dev
     vars:
