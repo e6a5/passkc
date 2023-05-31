@@ -4,6 +4,10 @@
 
 ## Installation
 
+```sh
+	brew install e6a5/tap/passkc
+```
+
 ## Usage
 
 passkc supports the following commands:
