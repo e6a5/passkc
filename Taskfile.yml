@@ -6,8 +6,8 @@ tasks:
       - >
         go build -v -trimpath 
         --ldflags "-X main.version=$VERSION" 
-        -o {{.BUILD_NAME}}
-    env:
+        -o "passkc"    
+  env:
       VERSION: dev
       OS: "{{OS}}"
       ARCH: "{{ARCH}}"
@@ -22,7 +22,7 @@ tasks:
 
   build:name:darwin-amd64:
     cmds:
-      - echo "passkc-$VERSION-darwin-amd64"
+      - echo "passkc"
     env:
       VERSION: dev
 
