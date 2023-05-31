@@ -12,7 +12,7 @@ tasks:
       OS: "{{OS}}"
       ARCH: "{{ARCH}}"
       CGO_ENABLED: 1
-    vars:
+  vars:
       BUILD_NAME:
         sh: task build:name
 
