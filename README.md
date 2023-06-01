@@ -5,7 +5,7 @@
 ## Installation
 
 ```sh
-	brew install e6a5/tap/passkc
+  brew install e6a5/tap/passkc
 ```
 
 ## Usage
