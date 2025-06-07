@@ -22,23 +22,50 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/e6a5/passkc/kc"
+	"os"
+
 	"github.com/spf13/cobra"
 )
 
-// removeCmd represents the remove command
-var removeCmd = &cobra.Command{
-	Use:   "remove",
-	Short: "Remove a domain and its associated credentials from the Keychain.",
-	Long:  `The passkc remove command allows you to securely delete a specific domain and its associated username and password from the Keychain on macOS.`,
-	Args:  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
-	Run: func(cmd *cobra.Command, args []string) {
-		kc.RemoveService(args[0])
-	},
+type removeCmdRunner struct {
+	kcManager KeychainManager
+}
+
+func (r *removeCmdRunner) run(cmd *cobra.Command, args []string) {
+	domain := args[0]
+	quiet, _ := cmd.Flags().GetBool("quiet")
+
+	err := r.kcManager.RemoveData(domain)
+	if err != nil {
+		cmd.PrintErrf("Error removing credentials for %s: %v\n", domain, err)
+		os.Exit(1)
+	}
+
+	if !quiet {
+		cmd.Printf("Removed credentials for %s successfully\n", domain)
+	}
+}
+
+func newRemoveCmd(kcManager KeychainManager) *cobra.Command {
+	runner := &removeCmdRunner{
+		kcManager: kcManager,
+	}
+	return &cobra.Command{
+		Use:   "remove [domain]",
+		Short: "Remove credentials for a domain from the Keychain",
+		Long: `The passkc remove command removes the stored credentials for a specific domain.
+This action is irreversible.
+
+Examples:
+  # Remove credentials for a domain
+  passkc remove domain.com`,
+		Args: cobra.ExactArgs(1),
+		Run:  runner.run,
+	}
 }
 
 func init() {
-	rootCmd.AddCommand(removeCmd)
+	rootCmd.AddCommand(newRemoveCmd(&LiveKeychainManager{}))
 
 	// Here you will define your flags and configuration settings.
 

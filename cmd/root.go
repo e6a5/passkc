@@ -30,13 +30,27 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "passkc",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "A Unix-style password manager using macOS Keychain",
+	Long: `passkc is a command-line tool for managing credentials in macOS Keychain.
+It follows Unix philosophy by:
+- Doing one thing well: managing credentials
+- Working with text streams
+- Being composable with other tools
+- Using plain text interfaces
+- Avoiding captive user interfaces
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Examples:
+  # Get credentials and pipe to clipboard
+  passkc get domain.com | pbcopy
+
+  # List credentials and filter
+  passkc show | grep "google"
+
+  # Set credentials from file
+  passkc set -f credentials.txt
+
+  # Output in JSON format
+  passkc show -o json | jq '.[] | select(.domain == "google.com")'`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -52,13 +66,21 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+	initializeFlags(rootCmd)
+}
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.passkc.yaml)")
+func initializeFlags(cmd *cobra.Command) {
+	// Global flags
+	cmd.PersistentFlags().StringP("output", "o", "text", "Output format (text|json|csv)")
+	cmd.PersistentFlags().StringP("config", "c", "", "Config file (default is $HOME/.passkc.yaml)")
+	cmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress prompts and non-essential output")
+
+	// Environment variable support
+	if domain := os.Getenv("PASSKC_DEFAULT_DOMAIN"); domain != "" {
+		cmd.PersistentFlags().String("domain", domain, "Default domain to use")
+	}
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	cmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

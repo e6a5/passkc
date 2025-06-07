@@ -1,60 +1,90 @@
 version: "3"
 
+vars:
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  BUILD_NAME: passkc
+
 tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+
+  deps:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
   build:
+    desc: Build the binary
+    deps: [deps]
     cmds:
-      - >
-        go build -v -trimpath 
-        --ldflags "-X main.version=$VERSION" 
-        -o "passkc"    
-  env:
-      VERSION: dev
-      OS: "{{OS}}"
-      ARCH: "{{ARCH}}"
+      - go build -v -trimpath -ldflags "-s -w -X main.version={{.VERSION}}" -o {{.BUILD_NAME}} .
+    env:
       CGO_ENABLED: 1
-  vars:
-      BUILD_NAME:
-        sh: task build:name
 
-  build:name:
+  build-race:
+    desc: Build with race detector
+    deps: [deps]
     cmds:
-      - task: "build:name:{{OS}}-{{ARCH}}"
-
-  build:name:darwin-amd64:
-    cmds:
-      - echo "passkc"
+      - go build -race -v -trimpath -ldflags "-s -w -X main.version={{.VERSION}}" -o {{.BUILD_NAME}}-race .
     env:
-      VERSION: dev
+      CGO_ENABLED: 1
 
-  checksum:upload:
+  test:
+    desc: Run tests
+    deps: [deps]
     cmds:
-      - gh release upload $VERSION ./checksum-{{.BUILD_NAME}}.txt
-    env:
-      VERSION: dev
-    vars:
-      BUILD_NAME:
-        sh: task build:name
-    preconditions:
-      - sh: "[ -n \"$GITHUB_TOKEN\" ]"
-        msg: "GITHUB_TOKEN must be set"
+      - go test -v ./...
 
-  archives:
+  test-coverage:
+    desc: Run tests with coverage
+    deps: [deps]
     cmds:
-      - tar -cvzf {{.BUILD_NAME}}.tar.gz ./{{.BUILD_NAME}}
-    env:
-      VERSION: dev
-    vars:
-      BUILD_NAME:
-        sh: task build:name
+      - go test -v -race -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report generated at coverage.html"
 
-  release:upload:
+  test-bench:
+    desc: Run benchmarks
+    deps: [deps]
     cmds:
-      - gh release upload $VERSION ./{{.BUILD_NAME}}.tar.gz
-    env:
-      VERSION: dev
-    vars:
-      BUILD_NAME:
-        sh: task build:name
-    preconditions:
-      - sh: "[ -n \"$GITHUB_TOKEN\" ]"
-        msg: "GITHUB_TOKEN must be set"
+      - go test -bench=. -benchmem ./...
+
+  lint:
+    desc: Run linters
+    cmds:
+      - gofmt -l -s .
+      - go vet ./...
+      - test -z "$(gofmt -l -s .)"
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f {{.BUILD_NAME}} {{.BUILD_NAME}}-race
+      - rm -f coverage.out coverage.html
+      - rm -f *.tar.gz *.txt
+
+  install:
+    desc: Install the binary
+    deps: [build]
+    cmds:
+      - cp {{.BUILD_NAME}} /usr/local/bin/
+
+  archive:
+    desc: Create release archive
+    deps: [build]
+    cmds:
+      - tar -czf {{.BUILD_NAME}}-{{.VERSION}}-{{OS}}-{{ARCH}}.tar.gz {{.BUILD_NAME}}
+      - shasum -a 256 {{.BUILD_NAME}}-{{.VERSION}}-{{OS}}-{{ARCH}}.tar.gz > {{.BUILD_NAME}}-{{.VERSION}}-{{OS}}-{{ARCH}}.tar.gz.sha256
+
+  demo:
+    desc: Run demo commands to showcase Unix philosophy features
+    deps: [build]
+    cmds:
+      - echo "=== Demo Unix Philosophy Features ==="
+      - echo ""
+      - echo "# Show help"
+      - ./{{.BUILD_NAME}} --help

@@ -22,31 +22,114 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/e6a5/passkc/kc"
+	"bufio"
+	"os"
+	"strings"
+
 	"github.com/spf13/cobra"
 )
 
-// setCmd represents the set command
-var setCmd = &cobra.Command{
-	Use:   "set",
-	Short: "Store username and password for a domain in the Keychain",
-	Long:  `The passkc set command allows you to securely store the username and password for a specific domain in the Keychain on macOS.`,
-	Args:  cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
-	Run: func(cmd *cobra.Command, args []string) {
-		kc.SetData(args[0], args[1])
-	},
+type setCmdRunner struct {
+	kcManager KeychainManager
+}
+
+func (r *setCmdRunner) run(cmd *cobra.Command, args []string) {
+	filePath, _ := cmd.Flags().GetString("file")
+	quiet, _ := cmd.Flags().GetBool("quiet")
+
+	if filePath != "" {
+		// Read credentials from file
+		file, err := os.Open(filePath)
+		if err != nil {
+			cmd.PrintErrf("Error opening file: %v\n", err)
+			os.Exit(1)
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			parts := strings.Fields(scanner.Text())
+			if len(parts) >= 2 {
+				domain := parts[0]
+				username := parts[1]
+				password := ""
+				if len(parts) > 2 {
+					password = parts[2]
+				}
+				if err := r.kcManager.SetData(domain, username, password); err != nil {
+					cmd.PrintErrf("Error setting credentials for %s: %v\n", domain, err)
+				} else if !quiet {
+					cmd.Printf("Saved credentials for %s\n", domain)
+				}
+			}
+		}
+	} else if len(args) == 2 {
+		// Set credentials from command line arguments
+		domain := args[0]
+		username := args[1]
+		if err := r.kcManager.SetData(domain, username, ""); err != nil {
+			cmd.PrintErrf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		if !quiet {
+			cmd.Println("Saved successfully")
+		}
+	} else {
+		// Read from stdin
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			parts := strings.Fields(scanner.Text())
+			if len(parts) >= 2 {
+				domain := parts[0]
+				username := parts[1]
+				password := ""
+				if len(parts) > 2 {
+					password = parts[2]
+				}
+				if err := r.kcManager.SetData(domain, username, password); err != nil {
+					cmd.PrintErrf("Error: %v\n", err)
+					os.Exit(1)
+				}
+				if !quiet {
+					cmd.Println("Saved successfully")
+				}
+			} else {
+				cmd.PrintErrf("Error: invalid input format\n")
+				os.Exit(1)
+			}
+		}
+	}
+}
+
+func newSetCmd(kcManager KeychainManager) *cobra.Command {
+	runner := &setCmdRunner{
+		kcManager: kcManager,
+	}
+	cmd := &cobra.Command{
+		Use:   "set [domain] [username]",
+		Short: "Store credentials for a domain in the Keychain",
+		Long: `The passkc set command stores credentials for a domain in the Keychain.
+It supports input from file and stdin.
+
+Examples:
+  # Set credentials interactively
+  passkc set domain.com username
+
+  # Set credentials from file
+  passkc set -f credentials.txt
+
+  # Set credentials from stdin
+  echo "domain.com username password" | passkc set
+
+  # Set credentials in quiet mode
+  passkc set domain.com username -q`,
+		Args: cobra.MaximumNArgs(2),
+		Run:  runner.run,
+	}
+	cmd.Flags().StringP("file", "f", "", "Read credentials from file")
+	return cmd
 }
 
 func init() {
-	rootCmd.AddCommand(setCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// setCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// setCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(newSetCmd(&LiveKeychainManager{}))
 }

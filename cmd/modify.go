@@ -22,28 +22,52 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"github.com/e6a5/passkc/kc"
+	"os"
+
 	"github.com/spf13/cobra"
 )
 
-// modifyCmd represents the modify command
-var modifyCmd = &cobra.Command{
-	Use:   "modify",
-	Short: "Modify username and/or password for a domain in the Keychain.",
-	Long:  `The passkc modify command allows you to update the username and/or password for a specific domain in the Keychain on macOS.`,
-	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		service := args[0]
-		account := ""
-		if len(args) > 1 {
-			account = args[1]
-		}
-		kc.ModifyData(service, account)
-	},
+type modifyCmdRunner struct {
+	kcManager KeychainManager
+}
+
+func (r *modifyCmdRunner) run(cmd *cobra.Command, args []string) {
+	domain := args[0]
+	newUsername := args[1]
+	quiet, _ := cmd.Flags().GetBool("quiet")
+
+	// We use SetData which will prompt for a password and update if the item exists
+	err := r.kcManager.SetData(domain, newUsername, "")
+	if err != nil {
+		cmd.PrintErrf("Error modifying credentials for %s: %v\n", domain, err)
+		os.Exit(1)
+	}
+
+	if !quiet {
+		cmd.Printf("Modified credentials for %s successfully\n", domain)
+	}
+}
+
+func newModifyCmd(kcManager KeychainManager) *cobra.Command {
+	runner := &modifyCmdRunner{
+		kcManager: kcManager,
+	}
+	return &cobra.Command{
+		Use:   "modify [domain] [new-username]",
+		Short: "Modify the username for a domain in the Keychain",
+		Long: `The passkc modify command updates the username for a specific domain.
+It will prompt for a new password. If you want to change the password, use 'set'.
+
+Examples:
+  # Modify the username for a domain
+  passkc modify domain.com new-username`,
+		Args: cobra.ExactArgs(2),
+		Run:  runner.run,
+	}
 }
 
 func init() {
-	rootCmd.AddCommand(modifyCmd)
+	rootCmd.AddCommand(newModifyCmd(&LiveKeychainManager{}))
 
 	// Here you will define your flags and configuration settings.
 
