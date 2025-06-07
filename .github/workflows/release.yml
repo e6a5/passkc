@@ -41,9 +41,9 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            arch: darwin-amd64
+            arch: amd64
           - os: macos-latest
-            arch: darwin-arm64
+            arch: arm64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -52,18 +52,22 @@ jobs:
           fetch-depth: 0  # Needed for git describe
 
       - name: Parse tool versions
-        uses: endorama/asdf-parse-tool-versions@v1
-        id: versions
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: kachick/setup-asdf@v1
         with:
-          go-version: ${{ steps.versions.outputs.golang }}
+          asdf_version: latest
 
-      - name: Install Task
-        uses: arduino/setup-task@v2
-        with:
-          version: ${{ steps.versions.outputs.task }}
+      - name: Install tools from .tool-versions
+        run: |
+          asdf plugin add golang
+          asdf plugin add task
+          asdf install
+          echo "$(asdf where golang)/bin" >> $GITHUB_PATH
+          echo "$(asdf where task)/bin" >> $GITHUB_PATH
+
+      - name: Verify tool versions
+        run: |
+          go version
+          task --version
 
       - name: Install dependencies
         run: task deps
@@ -72,25 +76,26 @@ jobs:
         run: task test
 
       - name: Build binary
-        run: task build
+        run: |
+          go build -v -trimpath -ldflags "-s -w -X main.version=${{ needs.create-release.outputs.version }}" -o passkc .
         env:
-          VERSION: ${{ needs.create-release.outputs.version }}
+          CGO_ENABLED: 1
 
       - name: Create archive
-        run: task archive
-        env:
-          VERSION: ${{ needs.create-release.outputs.version }}
+        run: |
+          tar -czf passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz passkc
+          shasum -a 256 passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz > passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload release assets
         run: |
           gh release upload ${{ needs.create-release.outputs.version }} \
-            passkc-${{ needs.create-release.outputs.version }}-${{ runner.os }}-${{ runner.arch }}.tar.gz \
-            passkc-${{ needs.create-release.outputs.version }}-${{ runner.os }}-${{ runner.arch }}.tar.gz.sha256
+            passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz \
+            passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
-        if: matrix.os == 'macos-latest' && matrix.arch == 'darwin-amd64'
+        if: matrix.arch == 'amd64'
         run: gh release edit ${{ needs.create-release.outputs.version }} --draft=false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
