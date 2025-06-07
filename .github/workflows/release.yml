@@ -52,7 +52,7 @@ jobs:
           fetch-depth: 0  # Needed for git describe
 
       - name: Parse tool versions
-        uses: kachick/setup-asdf@v1
+        uses: kachick/action-parse-asdf-tool-versions@v3
         with:
           asdf_version: latest
 
