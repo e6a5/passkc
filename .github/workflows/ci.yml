@@ -43,11 +43,10 @@ jobs:
     - name: Run vet
       run: go vet ./...
 
-    - name: Install golangci-lint
-      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-    - name: Run golangci-lint
-      run: golangci-lint run
+    - name: Install and run staticcheck
+      run: |
+        go install honnef.co/go/tools/cmd/staticcheck@latest
+        staticcheck ./...
 
   security:
     name: Security Scan

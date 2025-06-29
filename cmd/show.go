@@ -102,12 +102,21 @@ func (r *showCmdRunner) run(cmd *cobra.Command, args []string) {
 		if creds == nil {
 			creds = make([]kc.Credential, 0)
 		}
-		json.NewEncoder(cmd.OutOrStdout()).Encode(creds)
+		if err := json.NewEncoder(cmd.OutOrStdout()).Encode(creds); err != nil {
+			cmd.PrintErrf("Error encoding JSON: %v\n", err)
+			os.Exit(1)
+		}
 	case "csv":
 		w := csv.NewWriter(cmd.OutOrStdout())
-		w.Write([]string{"Domain", "Username"})
+		if err := w.Write([]string{"Domain", "Username"}); err != nil {
+			cmd.PrintErrf("Error writing CSV header: %v\n", err)
+			os.Exit(1)
+		}
 		for _, cred := range creds {
-			w.Write([]string{cred.Domain, cred.Username})
+			if err := w.Write([]string{cred.Domain, cred.Username}); err != nil {
+				cmd.PrintErrf("Error writing CSV row: %v\n", err)
+				os.Exit(1)
+			}
 		}
 		w.Flush()
 	default:

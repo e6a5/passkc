@@ -128,7 +128,11 @@ func (r *setCmdRunner) handleFileInput(cmd *cobra.Command, filePath string, quie
 		cmd.PrintErrf("Error: cannot open file '%s': %v\n", filePath, err)
 		os.Exit(1)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			cmd.PrintErrf("Warning: failed to close file: %v\n", closeErr)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0

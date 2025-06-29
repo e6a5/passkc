@@ -218,7 +218,7 @@ func TestModifyCommand(t *testing.T) {
 
 	// Test quiet mode
 	mockKC.setCalls = nil // Reset calls
-	output, err = execute(t, mockKC, "modify", "google.com", "newuser2", "-q")
+	_, err = execute(t, mockKC, "modify", "google.com", "newuser2", "-q")
 	assert.NoError(t, err)
 	// Should still have some output for the "Updating credentials" message unless we make it completely quiet
 	assert.Len(t, mockKC.setCalls, 1)

@@ -81,10 +81,16 @@ func (r *getCmdRunner) run(cmd *cobra.Command, args []string) {
 
 	switch outputFormat {
 	case "json":
-		json.NewEncoder(cmd.OutOrStdout()).Encode(cred)
+		if err := json.NewEncoder(cmd.OutOrStdout()).Encode(cred); err != nil {
+			cmd.PrintErrf("Error encoding JSON: %v\n", err)
+			os.Exit(1)
+		}
 	case "csv":
 		w := csv.NewWriter(cmd.OutOrStdout())
-		w.Write([]string{cred.Domain, cred.Username, cred.Password})
+		if err := w.Write([]string{cred.Domain, cred.Username, cred.Password}); err != nil {
+			cmd.PrintErrf("Error writing CSV: %v\n", err)
+			os.Exit(1)
+		}
 		w.Flush()
 	default:
 		if passwordOnly || quiet {
