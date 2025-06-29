@@ -30,3 +30,7 @@ coverage.html
 passkc-*
 coverage.out
 passkc
+
+# Security scan results
+gosec-results.sarif
+gosec-results.json

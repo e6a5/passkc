@@ -1,0 +1,78 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  # Enable only essential and valuable linters
+  enable:
+    # Code correctness
+    - errcheck         # Check for unchecked errors
+    - govet           # Go vet checks
+    - staticcheck     # Go static analysis
+    - typecheck       # Type checking
+    - gosimple        # Simplify code
+    - ineffassign     # Detect ineffectual assignments
+    - unused          # Find unused code
+
+    # Code style and formatting
+    - gofmt           # Check formatting
+    - goimports       # Check imports formatting
+    - misspell        # Fix spelling mistakes
+    - whitespace      # Check for trailing whitespace
+
+    # Security
+    - gosec           # Security issues
+
+    # Best practices
+    - bodyclose       # Check HTTP response body is closed
+    - rowserrcheck    # Check SQL rows.Err
+    - copyloopvar     # Check for loop variable capture issues
+
+  # Disable overly strict linters
+  disable:
+    - mnd             # Magic number detection - too noisy for small projects
+    - funlen          # Function length - subjective for small projects
+    - gocyclo         # Cyclomatic complexity - covered by code review
+    - lll             # Line length - modern screens can handle longer lines
+    - dupl            # Duplicate code - sometimes acceptable for clarity
+    - goconst         # Constants detection - not always needed
+    - exhaustive      # Exhaustive switch - too strict
+    - gocritic        # Very opinionated, many false positives
+    - noctx           # Context checks - sometimes overkill
+    - nolintlint      # Linter directive checks - not critical
+
+linters-settings:
+  gosec:
+    # Exclude rules that are too noisy for this type of project
+    excludes:
+      - G204  # Subprocess launched with variable - needed for CLI tools
+      - G304  # File path provided as taint input - common in file operations
+    # Exclude generated files
+    exclude-generated: true
+    # Set severity and confidence levels
+    severity: "medium"
+    confidence: "medium"
+  
+  misspell:
+    locale: US
+
+issues:
+  exclude-rules:
+    # Test files can be more lenient
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+    
+    # Allow long lines in quotes file since they contain quote text
+    - path: internal/quotes/quotes\.go
+      linters:
+        - all
+  
+  # Don't exclude common linting issues automatically
+  exclude-use-default: false
+  
+  # Custom exclusions for common Go patterns
+  exclude:
+    - 'declaration of "(err|ctx)" shadows declaration at'
+    - 'should have a package comment' 

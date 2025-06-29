@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Enhanced security scanning with gosec configuration
+- SARIF output format for security scan results  
+- Dedicated gosec configuration file (.gosec.json)
+- Improved CI workflow with GitHub CodeQL integration
+
+### Changed
+- Upgraded Go version requirement from 1.21 to 1.23
+- Enhanced golangci-lint configuration with better gosec integration
+- Updated all documentation to reflect Go 1.23 requirement
+- Improved development workflow documentation
+
+### Fixed
+- Fixed gosec integration in CI workflow (corrected package path)
+- Fixed misspelling: "Cancelled" → "Canceled"
+- Resolved golangci-lint configuration version compatibility
+
 ## [1.0.4] - 2024-01-XX
 
 ### Added

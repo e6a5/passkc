@@ -61,7 +61,14 @@ jobs:
         go-version-file: 'go.mod'
 
     - name: Install gosec
-      run: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+      run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
     - name: Run gosec security scanner
-      run: gosec ./... 
+      run: |
+        gosec -conf=.gosec.json -fmt=sarif -out=gosec-results.sarif -stdout -verbose=text ./...
+        
+    - name: Upload SARIF file
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: gosec-results.sarif 

@@ -35,7 +35,7 @@ go install github.com/e6a5/passkc@latest
 ### Requirements
 
 - macOS (uses macOS Keychain for secure storage)
-- Go 1.21+ (if building from source)
+- Go 1.23+ (if building from source)
 
 ## Basic Usage
 
@@ -212,7 +212,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ### Prerequisites
 
 - macOS (required for keychain integration)
-- Go 1.21+ (automatically detected from go.mod)
+- Go 1.23+ (automatically detected from go.mod)
 
 ### Getting Started
 
@@ -236,6 +236,10 @@ go fmt ./...
 # Lint (install golangci-lint first)
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 golangci-lint run
+
+# Security scanning
+go install github.com/securego/gosec/v2/cmd/gosec@latest
+gosec -conf=.gosec.json ./...
 ```
 
 ### Contributing

@@ -68,7 +68,7 @@ func (r *removeCmdRunner) run(cmd *cobra.Command, args []string) {
 		if scanner.Scan() {
 			response := strings.ToLower(strings.TrimSpace(scanner.Text()))
 			if response != "y" && response != "yes" {
-				cmd.Printf("Cancelled.\n")
+				cmd.Printf("Canceled.\n")
 				return
 			}
 		}

@@ -1,0 +1,27 @@
+{
+  "exclude-generated": true,
+  "tests": true,
+  "exclude-dirs": [
+    "vendor",
+    ".git"
+  ],
+  "exclude": [
+    "G204",
+    "G304"
+  ],
+  "severity": "medium",
+  "confidence": "medium",
+  "rules": {
+    "G101": {
+      "pattern": "(?i)passwd|pass|password|pwd|secret|token|jwt|auth",
+      "ignore_entropy": false,
+      "entropy_threshold": 80.0,
+      "per_char_threshold": 3.0,
+      "truncate": 32
+    }
+  },
+  "global": {
+    "nosec": false,
+    "audit": true
+  }
+} 

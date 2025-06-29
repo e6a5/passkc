@@ -26,12 +26,12 @@ This project adheres to a Code of Conduct that we expect all contributors to fol
    ```
 3. **Install dependencies**:
    ```bash
-   task deps
+   go mod download
    ```
 4. **Build and test**:
    ```bash
-   task build
-   task test
+   go build -v ./...
+   go test -v -race ./...
    ```
 
 ## Development Workflow
@@ -39,8 +39,7 @@ This project adheres to a Code of Conduct that we expect all contributors to fol
 ### Prerequisites
 
 - macOS (required for keychain integration)
-- Go 1.21+
-- [Task](https://taskfile.dev/) for build automation
+- Go 1.23+
 
 ### Making Changes
 
@@ -57,14 +56,15 @@ This project adheres to a Code of Conduct that we expect all contributors to fol
 
 3. **Test your changes**:
    ```bash
-   task test           # Run all tests
-   task test-coverage  # Generate coverage report
-   task lint           # Run linters
+   go test -v -race ./...                    # Run all tests
+   go test -v -race -coverprofile=coverage.out ./...  # Generate coverage report
+   golangci-lint run                         # Run linters
+   gosec -conf=.gosec.json ./...            # Security scan
    ```
 
 4. **Test manually**:
    ```bash
-   task build
+   go build -v ./...
    ./passkc --help     # Test CLI functionality
    ```
 
@@ -150,7 +150,9 @@ passkc/
 ├── kc/            # Core keychain functionality
 ├── main.go        # Entry point
 ├── go.mod         # Go module definition
-├── Taskfile.yml   # Build automation
+├── .github/       # GitHub workflows and templates
+├── .gosec.json    # Security scanning configuration
+├── .golangci.yml  # Linting configuration
 └── README.md      # User documentation
 ```
 
