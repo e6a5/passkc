@@ -28,6 +28,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/e6a5/passkc/kc"
 	"github.com/spf13/cobra"
 )
 
@@ -37,23 +38,40 @@ type getCmdRunner struct {
 
 func (r *getCmdRunner) run(cmd *cobra.Command, args []string) {
 	var domain string
+
 	if len(args) > 0 {
 		domain = args[0]
 	} else {
 		// Read from stdin if no domain provided
-		scanner := bufio.NewScanner(os.Stdin)
-		if scanner.Scan() {
-			domain = strings.TrimSpace(scanner.Text())
+		if r.hasStdinInput() {
+			scanner := bufio.NewScanner(os.Stdin)
+			if scanner.Scan() {
+				domain = strings.TrimSpace(scanner.Text())
+			}
 		}
 	}
 
 	if domain == "" {
-		cmd.PrintErrf("Error: domain is required\n")
+		cmd.PrintErrf("Usage: passkc get <domain>\n\n")
+		cmd.PrintErrf("Examples:\n")
+		cmd.PrintErrf("  passkc get github.com                    # Show domain and username only\n")
+		cmd.PrintErrf("  passkc get github.com -p                 # Show password only\n")
+		cmd.PrintErrf("  passkc get github.com -q                 # Quiet mode (password only)\n")
+		cmd.PrintErrf("  passkc get github.com -q | pbcopy        # Copy password to clipboard\n")
+		cmd.PrintErrf("  echo \"github.com\" | passkc get          # Read domain from pipe\n")
+		cmd.PrintErrf("\nFor more help: passkc get --help\n")
+		os.Exit(1)
+	}
+
+	// Validate domain
+	if err := kc.ValidateDomain(domain); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	outputFormat, _ := cmd.Flags().GetString("output")
 	quiet, _ := cmd.Flags().GetBool("quiet")
+	passwordOnly, _ := cmd.Flags().GetBool("password-only")
 
 	cred, err := r.kcManager.GetData(domain)
 	if err != nil {
@@ -69,11 +87,24 @@ func (r *getCmdRunner) run(cmd *cobra.Command, args []string) {
 		w.Write([]string{cred.Domain, cred.Username, cred.Password})
 		w.Flush()
 	default:
-		if !quiet {
-			cmd.Printf("Domain: %s\nUsername: %s\n", cred.Domain, cred.Username)
+		if passwordOnly || quiet {
+			// Just output the password
+			cmd.Print(cred.Password)
+		} else {
+			// SECURITY FIX: By default, only show domain and username
+			// Never show password in plain text unless explicitly requested
+			cmd.Printf("Domain: %s\n", cred.Domain)
+			cmd.Printf("Username: %s\n", cred.Username)
+			cmd.Printf("\nTo get the password:\n")
+			cmd.Printf("  passkc get %s -p                 # Show password\n", domain)
+			cmd.Printf("  passkc get %s -q | pbcopy        # Copy to clipboard\n", domain)
 		}
-		cmd.Print(cred.Password)
 	}
+}
+
+func (r *getCmdRunner) hasStdinInput() bool {
+	stat, _ := os.Stdin.Stat()
+	return (stat.Mode() & os.ModeCharDevice) == 0
 }
 
 func newGetCmd(kcManager KeychainManager) *cobra.Command {
@@ -81,23 +112,20 @@ func newGetCmd(kcManager KeychainManager) *cobra.Command {
 		kcManager: kcManager,
 	}
 	cmd := &cobra.Command{
-		Use:   "get [domain]",
-		Short: "Retrieve username and password for a domain from the Keychain",
-		Long: `The passkc get command retrieves the stored username and password for a specific domain.
-It supports multiple output formats and can be used in pipelines.
+		Use:   "get <domain>",
+		Short: "Retrieve credentials for a website or service",
+		Long: `Retrieve your saved username and password for a domain.
+
+SECURITY: By default, only shows domain and username (password is hidden).
+Use the -p flag to show the password, or -q to output only the password.
 
 Examples:
-  # Get credentials in default format
-  passkc get domain.com
-
-  # Get credentials in JSON format
-  passkc get domain.com -o json
-
-  # Get credentials and pipe to clipboard
-  passkc get domain.com | pbcopy
-
-  # Get credentials for domain from stdin
-  echo "domain.com" | passkc get`,
+  passkc get github.com                    # Show domain and username only (secure)
+  passkc get github.com -p                 # Show password only  
+  passkc get github.com -q                 # Quiet mode (password only)
+  passkc get github.com -o json            # Output as JSON (includes password)
+  passkc get github.com -q | pbcopy        # Copy password to clipboard (recommended)
+  echo "github.com" | passkc get           # Read domain from pipe`,
 		Args: cobra.MaximumNArgs(1),
 		Run:  runner.run,
 	}

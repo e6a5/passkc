@@ -48,15 +48,34 @@ func (r *showCmdRunner) run(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// Show helpful message if no credentials exist
+	if len(creds) == 0 && outputFormat == "text" && !quiet {
+		cmd.Printf("No credentials found.\n\n")
+		cmd.Printf("To add your first credential:\n")
+		cmd.Printf("  passkc set github.com myusername\n\n")
+		cmd.Printf("For help: passkc --help\n")
+		return
+	}
+
+	originalCount := len(creds)
+
 	// Filter credentials if pattern is provided
 	if pattern != "" {
 		filtered := make([]kc.Credential, 0)
 		for _, cred := range creds {
-			if strings.Contains(cred.Domain, pattern) || strings.Contains(cred.Username, pattern) {
+			if strings.Contains(strings.ToLower(cred.Domain), strings.ToLower(pattern)) ||
+				strings.Contains(strings.ToLower(cred.Username), strings.ToLower(pattern)) {
 				filtered = append(filtered, cred)
 			}
 		}
 		creds = filtered
+
+		// Show message if pattern filtered out all results
+		if len(creds) == 0 && outputFormat == "text" && !quiet {
+			cmd.Printf("No credentials found matching pattern '%s'.\n", pattern)
+			cmd.Printf("Found %d total credentials. Try a different search pattern.\n", originalCount)
+			return
+		}
 	}
 
 	// Sort credentials
@@ -68,6 +87,11 @@ func (r *showCmdRunner) run(cmd *cobra.Command, args []string) {
 	case "username":
 		sort.Slice(creds, func(i, j int) bool {
 			return creds[i].Username < creds[j].Username
+		})
+	default:
+		// Default sort by domain
+		sort.Slice(creds, func(i, j int) bool {
+			return creds[i].Domain < creds[j].Domain
 		})
 	}
 
@@ -88,10 +112,27 @@ func (r *showCmdRunner) run(cmd *cobra.Command, args []string) {
 		w.Flush()
 	default:
 		if !quiet {
-			cmd.Println("List of credentials:")
+			if pattern != "" {
+				cmd.Printf("Credentials matching '%s' (%d found):\n\n", pattern, len(creds))
+			} else {
+				cmd.Printf("Saved credentials (%d total):\n\n", len(creds))
+			}
 		}
-		for _, cred := range creds {
-			cmd.Printf("%s (%s)\n", cred.Domain, cred.Username)
+
+		for i, cred := range creds {
+			if quiet {
+				cmd.Printf("%s\n", cred.Domain)
+			} else {
+				cmd.Printf("  %d. %s\n", i+1, cred.Domain)
+				cmd.Printf("     Username: %s\n", cred.Username)
+				if i < len(creds)-1 {
+					cmd.Printf("\n")
+				}
+			}
+		}
+
+		if !quiet && len(creds) > 0 {
+			cmd.Printf("\nTip: Use 'passkc get <domain>' to retrieve a password\n")
 		}
 	}
 }
@@ -102,28 +143,21 @@ func newShowCmd(kcManager KeychainManager) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "show",
-		Short: "List all stored credentials",
-		Long: `The passkc show command lists all stored credentials.
-It supports filtering, sorting, and multiple output formats.
+		Short: "List all saved credentials",
+		Long: `List all your saved credentials with their domains and usernames.
+
+By default, shows a numbered list with domains and usernames.
+Use flags to filter, sort, or change the output format.
 
 Examples:
-  # List all credentials
-  passkc show
-
-  # List credentials in JSON format
-  passkc show -o json
-
-  # Filter credentials by pattern
-  passkc show --pattern "*.com"
-
-  # Sort credentials by domain
-  passkc show --sort domain
-
-  # Combine filtering and sorting
-  passkc show --pattern "google" --sort username`,
+  passkc show                              # List all credentials
+  passkc show --pattern github            # Search for credentials containing "github"
+  passkc show --sort username             # Sort by username instead of domain
+  passkc show -o json                     # Output as JSON
+  passkc show -q                          # Quiet mode (domains only)`,
 		Run: runner.run,
 	}
-	cmd.Flags().String("pattern", "", "Filter credentials by pattern")
+	cmd.Flags().String("pattern", "", "Filter credentials by domain or username")
 	cmd.Flags().String("sort", "", "Sort by field (domain|username)")
 	return cmd
 }

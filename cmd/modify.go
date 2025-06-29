@@ -24,6 +24,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/e6a5/passkc/kc"
 	"github.com/spf13/cobra"
 )
 
@@ -32,19 +33,52 @@ type modifyCmdRunner struct {
 }
 
 func (r *modifyCmdRunner) run(cmd *cobra.Command, args []string) {
+	if len(args) < 2 {
+		cmd.PrintErrf("Usage: passkc modify <domain> <new-username>\n\n")
+		cmd.PrintErrf("Examples:\n")
+		cmd.PrintErrf("  passkc modify github.com newusername     # Change username and password\n")
+		cmd.PrintErrf("  passkc modify github.com same-user -q    # Change password only (quiet)\n")
+		cmd.PrintErrf("\nNote: This will prompt for a new password.\n")
+		cmd.PrintErrf("To keep the same password, use: passkc set <domain> <username>\n")
+		cmd.PrintErrf("\nFor more help: passkc modify --help\n")
+		os.Exit(1)
+	}
+
 	domain := args[0]
 	newUsername := args[1]
 	quiet, _ := cmd.Flags().GetBool("quiet")
 
-	// We use SetData which will prompt for a password and update if the item exists
-	err := r.kcManager.SetData(domain, newUsername, "")
+	// Validate inputs
+	if err := kc.ValidateDomain(domain); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	if err := kc.ValidateUsername(newUsername); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Check if credentials exist first
+	_, err := r.kcManager.GetData(domain)
 	if err != nil {
-		cmd.PrintErrf("Error modifying credentials for %s: %v\n", domain, err)
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Show what we're changing
+	if !quiet {
+		cmd.Printf("Updating credentials for %s with username '%s'\n", domain, newUsername)
+	}
+
+	// We use SetData which will prompt for a password and update if the item exists
+	err = r.kcManager.SetData(domain, newUsername, "")
+	if err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	if !quiet {
-		cmd.Printf("Modified credentials for %s successfully\n", domain)
+		cmd.Printf("✓ Updated credentials for %s\n", domain)
 	}
 }
 
@@ -53,14 +87,22 @@ func newModifyCmd(kcManager KeychainManager) *cobra.Command {
 		kcManager: kcManager,
 	}
 	return &cobra.Command{
-		Use:   "modify [domain] [new-username]",
-		Short: "Modify the username for a domain in the Keychain",
-		Long: `The passkc modify command updates the username for a specific domain.
-It will prompt for a new password. If you want to change the password, use 'set'.
+		Use:   "modify <domain> <new-username>",
+		Short: "Update credentials for a website or service",
+		Long: `Update the username and/or password for existing credentials.
+
+This command changes both the username and password for a domain.
+You'll be prompted to enter a new password securely.
+
+If you only want to change the password but keep the same username,
+use the 'set' command instead.
 
 Examples:
-  # Modify the username for a domain
-  passkc modify domain.com new-username`,
+  passkc modify github.com newusername     # Change username and password
+  passkc modify github.com same-user       # Keep username, change password
+  
+Tip: To change only the password, use:
+  passkc set github.com existing-username`,
 		Args: cobra.ExactArgs(2),
 		Run:  runner.run,
 	}

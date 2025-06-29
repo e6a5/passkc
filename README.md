@@ -1,296 +1,273 @@
 # passkc
 
-**passkc** is a Unix-style command-line tool for storing and retrieving credentials from the macOS Keychain. It follows Unix philosophy by doing one thing well, working with text streams, and being composable with other tools.
+**passkc** is a simple password manager for macOS that stores your passwords securely in the macOS Keychain.
 
-## Features
+## Quick Start
 
-🔐 **Secure**: Uses macOS Keychain for secure credential storage
-📝 **Text Streams**: Read from stdin, output to stdout, pipe with other commands
-🔧 **Multiple Formats**: Support for text, JSON, and CSV output
-🔍 **Filtering & Sorting**: Pattern matching and sorting capabilities
-📁 **Batch Operations**: Import credentials from files
-🤐 **Quiet Mode**: Script-friendly operation with minimal output
-🧪 **Well Tested**: Comprehensive test coverage with dependency injection
+```bash
+# Save a password
+passkc set github.com myusername
+
+# Show credentials (password hidden by default)
+passkc get github.com
+
+# Copy password to clipboard (secure)
+passkc get github.com -q | pbcopy
+
+# List all saved passwords
+passkc show
+```
 
 ## Installation
 
 ### Homebrew
 
-```sh
+```bash
 brew install e6a5/tap/passkc
 ```
 
 ### From Source
 
-```sh
-# Using Go
+```bash
 go install github.com/e6a5/passkc@latest
-
-# Using Task (recommended for development)
-git clone https://github.com/e6a5/passkc.git
-cd passkc
-task build
 ```
 
 ### Requirements
 
-- macOS (uses macOS Keychain)
-- Go 1.21+ (for building from source)
+- macOS (uses macOS Keychain for secure storage)
+- Go 1.21+ (if building from source)
 
-## Usage
+## Basic Usage
 
-### Basic Commands
+### Save a Password
 
 ```bash
-# Store credentials (interactive password prompt)
-passkc set domain.com username
+# Interactive: prompts for username and password
+passkc set github.com
 
-# Retrieve credentials
-passkc get domain.com
+# Specify username, prompts for password
+passkc set github.com myusername
+```
 
-# List all credentials
+### Get a Password
+
+```bash
+# Show domain and username (password hidden for security)
+passkc get github.com
+
+# Get the password securely
+passkc get github.com -p
+
+# Copy password to clipboard (recommended)
+passkc get github.com -q | pbcopy
+```
+
+### List Your Passwords
+
+```bash
+# List all saved passwords
 passkc show
 
-# Modify credentials
-passkc modify domain.com new-username
+# Search for specific sites
+passkc show --pattern github
 
-# Remove credentials
-passkc remove domain.com
+# Sort by username
+passkc show --sort username
 ```
 
-### Unix Philosophy Examples
+### Update or Remove
 
-**Text Stream Processing:**
 ```bash
-# Read domain from stdin
-echo "domain.com" | passkc get
+# Change username and password
+passkc modify github.com newusername
 
-# Pipe password to clipboard
-passkc get domain.com -q | pbcopy
-
-# Filter and search
-passkc show | grep "google"
+# Remove a password
+passkc remove github.com
 ```
 
-**Structured Output:**
-```bash
-# JSON output for programmatic use
-passkc show -o json | jq '.[] | select(.domain == "google.com")'
+## Advanced Features
 
-# CSV export
-passkc show -o csv > credentials.csv
+### Import Multiple Passwords
 
-# Quiet mode for scripts
-PASSWORD=$(passkc get domain.com -q)
+Create a file with your passwords:
+
+```text
+# credentials.txt
+github.com myuser mypass123
+google.com user@email.com secret456
+work-vpn.com employee pass789
 ```
 
-**Batch Operations:**
-```bash
-# Import from file (format: domain username [password])
-echo "google.com user1 pass1" > creds.txt
-echo "github.com user2 pass2" >> creds.txt
-passkc set -f creds.txt
+Import them:
 
-# Bulk export
+```bash
+passkc set -f credentials.txt
+```
+
+### JSON Output
+
+```bash
+# Get single credential as JSON
+passkc get github.com -o json
+
+# Export all credentials as JSON
 passkc show -o json > backup.json
 ```
 
-**Filtering and Sorting:**
+### Scripting
+
 ```bash
-# Filter by pattern
-passkc show --pattern "google"
+# Silent operation for scripts
+PASSWORD=$(passkc get github.com -q)
 
-# Sort by domain or username
-passkc show --sort domain
-passkc show --sort username
-
-# Combine filtering and output formats
-passkc show --pattern "*.com" --sort username -o json
+# Check if password exists
+if passkc get github.com -q > /dev/null 2>&1; then
+    echo "Password found"
+else
+    echo "No password saved"
+fi
 ```
 
 ## Command Reference
 
-### Global Flags
+| Command | Description | Example |
+|---------|-------------|---------|
+| `passkc set <domain> [username]` | Save a password | `passkc set github.com` |
+| `passkc get <domain>` | Show credentials (password hidden) | `passkc get github.com` |
+| `passkc get <domain> -p` | Show password only | `passkc get github.com -p` |
+| `passkc show` | List all passwords | `passkc show --pattern google` |
+| `passkc modify <domain> <username>` | Update credentials | `passkc modify github.com newuser` |
+| `passkc remove <domain>` | Delete a password | `passkc remove github.com` |
 
-- `-o, --output string`: Output format (`text`|`json`|`csv`) (default: `text`)
-- `-q, --quiet`: Suppress prompts and non-essential output
-- `-c, --config string`: Config file (default: `$HOME/.passkc.yaml`)
+### Useful Flags
 
-### Commands
+| Flag | Description | Example |
+|------|-------------|---------|
+| `-q, --quiet` | Silent output | `passkc get github.com -q` |
+| `-p, --password-only` | Show only password | `passkc get github.com -p` |
+| `-o, --output json` | JSON output | `passkc show -o json` |
+| `--pattern <text>` | Filter results | `passkc show --pattern google` |
+| `--sort <field>` | Sort by domain/username | `passkc show --sort username` |
+| `-f, --force` | Skip confirmations | `passkc remove github.com -f` |
 
-#### `passkc show`
-List all stored credentials with filtering and sorting options.
+## Security
 
-**Flags:**
-- `--pattern string`: Filter credentials by pattern
-- `--sort string`: Sort by field (`domain`|`username`)
+- 🔐 **Secure Storage**: Uses macOS Keychain, not plain text files
+- 🔒 **Hidden Input**: Passwords are entered securely (not visible on screen)
+- 🛡️ **System Integration**: Follows macOS security practices
+- 🚫 **No Cloud**: Everything stays on your Mac
 
-**Examples:**
+## Tips
+
+**Secure password access (recommended):**
 ```bash
-passkc show
-passkc show -o json
-passkc show --pattern "google" --sort username
+passkc get github.com -q | pbcopy    # Copy to clipboard without showing
 ```
 
-#### `passkc get [domain]`
-Retrieve credentials for a domain. Can read domain from stdin if not provided.
-
-**Flags:**
-- `-p, --password-only`: Output only the password
-
-**Examples:**
+**Show password when needed:**
 ```bash
-passkc get domain.com
-passkc get domain.com -o json
-echo "domain.com" | passkc get
+passkc get github.com -p             # Display password only
 ```
 
-#### `passkc set [domain] [username]`
-Store credentials for a domain. Supports file input and stdin.
-
-**Flags:**
-- `-f, --file string`: Read credentials from file
-
-**Examples:**
+**Search for a site:**
 ```bash
-passkc set domain.com username
-passkc set -f credentials.txt
-echo "domain.com username password" | passkc set
+passkc show --pattern work
 ```
 
-#### `passkc modify [domain] [new-username]`
-Update the username for a domain.
-
-**Examples:**
+**Backup your passwords:**
 ```bash
-passkc modify domain.com new-username
+passkc show -o json > ~/passwords-backup.json
 ```
 
-#### `passkc remove [domain]`
-Remove credentials for a domain.
-
-**Examples:**
+**Add an alias for convenience:**
 ```bash
-passkc remove domain.com
+# Add to your ~/.zshrc or ~/.bashrc
+alias pc='passkc'
+alias pcg='passkc get'
+alias pcs='passkc set'
 ```
+
+## Getting Help
+
+```bash
+passkc --help              # General help
+passkc set --help          # Help for specific command
+```
+
+## Development
+
+```bash
+git clone https://github.com/e6a5/passkc.git
+cd passkc
+task build                  # Build the binary
+task test                   # Run tests
+```
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Development
 
 ### Prerequisites
 
-- Go 1.21+
-- Task (task runner)
-- Git
+- macOS (required for keychain integration)
+- Go 1.21+ (automatically detected from go.mod)
 
-### Setup
+### Getting Started
 
 ```bash
+# Clone the repository
 git clone https://github.com/e6a5/passkc.git
 cd passkc
-task deps  # Download dependencies
+
+# Install dependencies
+go mod download
+
+# Build
+go build -v ./...
+
+# Run tests
+go test -v -race ./...
+
+# Format code
+go fmt ./...
+
+# Lint (install golangci-lint first)
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+golangci-lint run
 ```
 
-### Available Tasks
+### Contributing
 
-```bash
-task                # List all available tasks
-task build          # Build the binary
-task test           # Run tests
-task test-coverage  # Run tests with coverage report
-task lint           # Run linters
-task clean          # Clean build artifacts
-task install        # Install binary to /usr/local/bin
-task demo           # Showcase Unix philosophy features
-```
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Testing
+- 🐛 [Report bugs](https://github.com/e6a5/passkc/issues/new?template=bug_report.md)
+- 💡 [Request features](https://github.com/e6a5/passkc/issues/new?template=feature_request.md)
+- 🔧 [Submit pull requests](https://github.com/e6a5/passkc/pulls)
 
-The project has comprehensive test coverage using dependency injection for mocking:
+### Philosophy
 
-```bash
-# Run all tests
-task test
+passkc follows a simple philosophy: **make password management disappear into practice**.
 
-# Run tests with coverage
-task test-coverage
+Like a good tool, it should be:
+- **Simple**: Intuitive commands that just work
+- **Secure**: Safe by default, no compromises  
+- **Fast**: Get your password and get back to work
+- **Unobtrusive**: Fits seamlessly into your workflow
 
-# Run benchmarks
-task test-bench
-```
+We believe the best password manager is one you don't have to think about.
 
-### Architecture
+## Community
 
-```
-cmd/           # CLI commands with dependency injection
-├── keychain.go    # KeychainManager interface and implementation
-├── show.go        # List credentials command
-├── get.go         # Retrieve credentials command
-├── set.go         # Store credentials command
-├── modify.go      # Modify credentials command
-├── remove.go      # Remove credentials command
-└── cli_test.go    # Comprehensive tests with mocks
-
-kc/            # Keychain abstraction layer
-└── kc.go          # Core keychain operations
-
-main.go        # Application entry point
-```
-
-## Unix Philosophy Compliance
-
-**passkc** follows Unix philosophy principles:
-
-1. **Do one thing well**: Manage credentials in macOS Keychain
-2. **Work together**: Pipe and chain with other Unix tools
-3. **Handle text streams**: Read from stdin, write to stdout
-4. **Plain text interface**: No captive user interfaces
-5. **Composability**: Every command can be a filter
-
-## Examples in Action
-
-**Daily Workflow:**
-```bash
-# Quick password copy
-passkc get work-email -q | pbcopy
-
-# Search and filter
-passkc show | grep -i "github\|gitlab" | head -5
-
-# Backup to JSON
-passkc show -o json > ~/backups/credentials-$(date +%Y%m%d).json
-
-# Import from CSV
-cat exported-passwords.csv | tail -n +2 | while IFS=, read domain user pass; do
-  echo "$domain $user $pass" | passkc set
-done
-```
-
-**Scripting:**
-```bash
-#!/bin/bash
-# Check if credentials exist for multiple domains
-DOMAINS=("github.com" "gitlab.com" "work.com")
-
-for domain in "${DOMAINS[@]}"; do
-  if passkc get "$domain" -q > /dev/null 2>&1; then
-    echo "✓ $domain: credentials found"
-  else
-    echo "✗ $domain: no credentials"
-  fi
-done
-```
+- 📖 [Code of Conduct](CODE_OF_CONDUCT.md)
+- 🔒 [Security Policy](SECURITY.md)
+- 📝 [Changelog](CHANGELOG.md)
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
-## Contributing
+## Acknowledgments
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Run tests (`task test`)
-4. Commit your changes (`git commit -m 'Add amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
+Thanks to all contributors who help make passkc better! 🔐

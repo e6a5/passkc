@@ -24,8 +24,10 @@ package kc
 import (
 	"fmt"
 	"strings"
+	"syscall"
 
 	"github.com/keybase/go-keychain"
+	"golang.org/x/term"
 )
 
 // Credential holds the data for a keychain entry.
@@ -41,15 +43,20 @@ func GetData(domain string) (*Credential, error) {
 	query := keychain.NewItem()
 	query.SetSecClass(keychain.SecClassGenericPassword)
 	query.SetService(fmt.Sprintf("com.passkc.%s", domain))
-	query.SetMatchLimit(keychain.MatchLimitAll)
+	query.SetMatchLimit(keychain.MatchLimitOne)
+	query.SetReturnAttributes(true)
+	query.SetReturnData(true)
 
 	results, err := keychain.QueryItem(query)
 	if err != nil {
-		return nil, err
+		if err == keychain.ErrorItemNotFound {
+			return nil, fmt.Errorf("no credentials found for '%s'. Use 'passkc set %s <username>' to add credentials", domain, domain)
+		}
+		return nil, fmt.Errorf("failed to access keychain: %v", err)
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("no credentials found for domain: %s", domain)
+		return nil, fmt.Errorf("no credentials found for '%s'. Use 'passkc set %s <username>' to add credentials", domain, domain)
 	}
 
 	// Get the first result
@@ -66,16 +73,24 @@ func GetData(domain string) (*Credential, error) {
 
 // SetData stores credentials in the Keychain.
 // If an entry for the service and account already exists, it will be updated.
-// If password is an empty string, the user will be prompted to enter it.
+// If password is an empty string, the user will be prompted to enter it securely.
 func SetData(domain, username, password string) error {
-	service := fmt.Sprintf("com.passkc.%s.%s", domain, username)
-	
+	// Fixed: Use consistent service naming scheme
+	service := fmt.Sprintf("com.passkc.%s", domain)
+
 	if password == "" {
-		// Prompt for password if not provided
-		fmt.Print("Enter password: ")
-		var input string
-		fmt.Scanln(&input)
-		password = input
+		// Secure password prompt
+		fmt.Printf("Enter password for %s@%s: ", username, domain)
+		bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			return fmt.Errorf("failed to read password: %v", err)
+		}
+		fmt.Println() // Add newline after password input
+		password = string(bytePassword)
+
+		if password == "" {
+			return fmt.Errorf("password cannot be empty")
+		}
 	}
 
 	item := keychain.NewItem()
@@ -99,8 +114,14 @@ func SetData(domain, username, password string) error {
 		attributes.SetData([]byte(password))
 
 		err = keychain.UpdateItem(query, attributes)
+		if err != nil {
+			return fmt.Errorf("failed to update credentials for '%s': %v", domain, err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("failed to save credentials for '%s': %v", domain, err)
 	}
-	return err
+
+	return nil
 }
 
 // RemoveData removes all credential entries for a given domain.
@@ -108,31 +129,39 @@ func RemoveData(domain string) error {
 	query := keychain.NewItem()
 	query.SetSecClass(keychain.SecClassGenericPassword)
 	query.SetService(fmt.Sprintf("com.passkc.%s", domain))
-	query.SetMatchLimit(keychain.MatchLimitAll)
+	query.SetMatchLimit(keychain.MatchLimitOne)
 
-	return keychain.DeleteItem(query)
+	err := keychain.DeleteItem(query)
+	if err == keychain.ErrorItemNotFound {
+		return fmt.Errorf("no credentials found for '%s'", domain)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to remove credentials for '%s': %v", domain, err)
+	}
+
+	return nil
 }
 
 func ListData() ([]Credential, error) {
 	query := keychain.NewItem()
 	query.SetSecClass(keychain.SecClassGenericPassword)
-	query.SetService("com.passkc")
 	query.SetMatchLimit(keychain.MatchLimitAll)
+	query.SetReturnAttributes(true)
 
+	// Search for all items with service names starting with "com.passkc."
 	results, err := keychain.QueryItem(query)
 	if err == keychain.ErrorItemNotFound {
 		return make([]Credential, 0), nil // Not an error, just no items
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to access keychain: %v", err)
 	}
 
 	creds := make([]Credential, 0)
 	for _, result := range results {
-		// Parse domain and username from service name
-		parts := strings.Split(result.Service, ".")
-		if len(parts) >= 4 {
-			domain := parts[2]
+		// Parse domain from service name: com.passkc.<domain>
+		if strings.HasPrefix(result.Service, "com.passkc.") {
+			domain := strings.TrimPrefix(result.Service, "com.passkc.")
 			username := result.Account
 			creds = append(creds, Credential{
 				Domain:   domain,
@@ -142,4 +171,22 @@ func ListData() ([]Credential, error) {
 	}
 
 	return creds, nil
+}
+
+// Helper function for better user input validation
+func ValidateDomain(domain string) error {
+	if domain == "" {
+		return fmt.Errorf("domain cannot be empty")
+	}
+	if strings.Contains(domain, " ") {
+		return fmt.Errorf("domain cannot contain spaces")
+	}
+	return nil
+}
+
+func ValidateUsername(username string) error {
+	if username == "" {
+		return fmt.Errorf("username cannot be empty")
+	}
+	return nil
 }

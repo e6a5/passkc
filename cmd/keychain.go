@@ -33,4 +33,4 @@ func (lkm *LiveKeychainManager) RemoveData(domain string) error {
 // newKeychainManager creates a new instance of the live keychain manager.
 func newKeychainManager() KeychainManager {
 	return &LiveKeychainManager{}
-} 
+}

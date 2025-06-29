@@ -30,27 +30,19 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "passkc",
-	Short: "A Unix-style password manager using macOS Keychain",
-	Long: `passkc is a command-line tool for managing credentials in macOS Keychain.
-It follows Unix philosophy by:
-- Doing one thing well: managing credentials
-- Working with text streams
-- Being composable with other tools
-- Using plain text interfaces
-- Avoiding captive user interfaces
+	Short: "Simple password manager using macOS Keychain",
+	Long: `passkc is a simple command-line password manager for macOS.
+Store and retrieve passwords securely using the macOS Keychain.
 
-Examples:
-  # Get credentials and pipe to clipboard
-  passkc get domain.com | pbcopy
+Common usage:
+  passkc set github.com myusername     # Save a password
+  passkc get github.com                # Retrieve a password
+  passkc show                          # List all saved passwords
+  passkc remove github.com             # Delete a password
 
-  # List credentials and filter
-  passkc show | grep "google"
-
-  # Set credentials from file
-  passkc set -f credentials.txt
-
-  # Output in JSON format
-  passkc show -o json | jq '.[] | select(.domain == "google.com")'`,
+Advanced usage:
+  passkc get github.com -q | pbcopy    # Copy password to clipboard
+  passkc show | grep google            # Search for specific sites`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -79,8 +71,4 @@ func initializeFlags(cmd *cobra.Command) {
 	if domain := os.Getenv("PASSKC_DEFAULT_DOMAIN"); domain != "" {
 		cmd.PersistentFlags().String("domain", domain, "Default domain to use")
 	}
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	cmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

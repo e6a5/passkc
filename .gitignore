@@ -26,3 +26,6 @@ dist/
 
 bin/
 coverage.html
+# passkc specific
+passkc-*
+coverage.out

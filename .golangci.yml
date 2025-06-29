@@ -1,0 +1,27 @@
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - deadcode
+    - unused
+    - staticcheck
+    - gosimple
+    - structcheck
+    - varcheck
+    - typecheck
+
+linters-settings:
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: github.com/e6a5/passkc
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  exclude-use-default: false

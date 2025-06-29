@@ -1,101 +1,65 @@
-name: Build and Release
+name: Release
 
 on:
   push:
     tags:
-      - '*'
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  create-release:
-    runs-on: ubuntu-22.04
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get tag annotation
-        run: echo "content=$(git tag --format='%(contents)' -n2 ${{ github.ref }})" >> $GITHUB_OUTPUT
-        id: notes
-
-      - name: Check for prerelease
-        # NOTE: if tag contains a - is a semver prerelease
-        run: echo "flag=$(echo '${{ github.ref }}' | grep '-' && echo '--prerelease' || echo '')" >> $GITHUB_OUTPUT
-        id: prerelease
-
-      - name: Get the version
-        id: get_version
-        run: echo "version=$(echo ${{ github.ref }} | cut -d / -f 3)" >> $GITHUB_OUTPUT
-
-      - name: Create release
-        run: gh release create ${{ steps.get_version.outputs.version }} --draft --title ${{ steps.get_version.outputs.version }} ${{ steps.prerelease.outputs.flag }} --notes '${{ steps.notes.outputs.content }}'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-and-release:
-    needs: create-release
+  release:
+    name: Release
+    runs-on: macos-latest
     strategy:
       matrix:
         include:
-          - os: macos-latest
-            arch: amd64
-          - os: macos-latest
-            arch: arm64
-    runs-on: ${{ matrix.os }}
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Needed for git describe
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Parse tool versions
-        uses: kachick/action-parse-asdf-tool-versions@v3
-        with:
-          asdf_version: latest
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
 
-      - name: Install tools from .tool-versions
-        run: |
-          asdf plugin add golang
-          asdf plugin add task
-          asdf install
-          echo "$(asdf where golang)/bin" >> $GITHUB_PATH
-          echo "$(asdf where task)/bin" >> $GITHUB_PATH
+    - name: Get version
+      id: version
+      run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Verify tool versions
-        run: |
-          go version
-          task --version
+    - name: Run tests
+      run: go test -v ./...
 
-      - name: Install dependencies
-        run: task deps
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 1
+      run: |
+        go build -v -trimpath -ldflags "-s -w -X main.version=${{ steps.version.outputs.version }}" -o passkc-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }} .
 
-      - name: Run tests
-        run: task test
+    - name: Create archive
+      run: |
+        tar -czf passkc-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz passkc-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}
+        shasum -a 256 passkc-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz > passkc-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz.sha256
 
-      - name: Build binary
-        run: |
-          go build -v -trimpath -ldflags "-s -w -X main.version=${{ needs.create-release.outputs.version }}" -o passkc .
-        env:
-          CGO_ENABLED: 1
-
-      - name: Create archive
-        run: |
-          tar -czf passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz passkc
-          shasum -a 256 passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz > passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
-
-      - name: Upload release assets
-        run: |
-          gh release upload ${{ needs.create-release.outputs.version }} \
-            passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz \
-            passkc-${{ needs.create-release.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish release
-        if: matrix.arch == 'amd64'
-        run: gh release edit ${{ needs.create-release.outputs.version }} --draft=false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload to release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          passkc-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          passkc-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz.sha256
+        tag_name: ${{ steps.version.outputs.version }}
+        name: ${{ steps.version.outputs.version }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

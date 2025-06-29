@@ -22,8 +22,11 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bufio"
 	"os"
+	"strings"
 
+	"github.com/e6a5/passkc/kc"
 	"github.com/spf13/cobra"
 )
 
@@ -32,17 +35,53 @@ type removeCmdRunner struct {
 }
 
 func (r *removeCmdRunner) run(cmd *cobra.Command, args []string) {
+	if len(args) == 0 {
+		cmd.PrintErrf("Usage: passkc remove <domain>\n\n")
+		cmd.PrintErrf("Examples:\n")
+		cmd.PrintErrf("  passkc remove github.com                 # Remove credentials for github.com\n")
+		cmd.PrintErrf("  passkc remove github.com -q              # Remove without confirmation\n")
+		cmd.PrintErrf("\nFor more help: passkc remove --help\n")
+		os.Exit(1)
+	}
+
 	domain := args[0]
 	quiet, _ := cmd.Flags().GetBool("quiet")
+	force, _ := cmd.Flags().GetBool("force")
 
-	err := r.kcManager.RemoveData(domain)
+	// Validate domain
+	if err := kc.ValidateDomain(domain); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Check if credentials exist first
+	cred, err := r.kcManager.GetData(domain)
 	if err != nil {
-		cmd.PrintErrf("Error removing credentials for %s: %v\n", domain, err)
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Confirmation prompt (unless forced or quiet)
+	if !force && !quiet {
+		cmd.Printf("Are you sure you want to remove credentials for '%s' (username: %s)? [y/N]: ", domain, cred.Username)
+		scanner := bufio.NewScanner(os.Stdin)
+		if scanner.Scan() {
+			response := strings.ToLower(strings.TrimSpace(scanner.Text()))
+			if response != "y" && response != "yes" {
+				cmd.Printf("Cancelled.\n")
+				return
+			}
+		}
+	}
+
+	err = r.kcManager.RemoveData(domain)
+	if err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	if !quiet {
-		cmd.Printf("Removed credentials for %s successfully\n", domain)
+		cmd.Printf("✓ Removed credentials for %s\n", domain)
 	}
 }
 
@@ -50,18 +89,23 @@ func newRemoveCmd(kcManager KeychainManager) *cobra.Command {
 	runner := &removeCmdRunner{
 		kcManager: kcManager,
 	}
-	return &cobra.Command{
-		Use:   "remove [domain]",
-		Short: "Remove credentials for a domain from the Keychain",
-		Long: `The passkc remove command removes the stored credentials for a specific domain.
-This action is irreversible.
+	cmd := &cobra.Command{
+		Use:   "remove <domain>",
+		Short: "Remove credentials for a website or service",
+		Long: `Remove stored credentials for a domain from the keychain.
+
+This action permanently deletes the saved username and password.
+By default, you'll be asked to confirm the deletion.
 
 Examples:
-  # Remove credentials for a domain
-  passkc remove domain.com`,
+  passkc remove github.com                 # Remove with confirmation prompt
+  passkc remove github.com --force         # Remove without confirmation
+  passkc remove github.com -q              # Remove quietly (no output)`,
 		Args: cobra.ExactArgs(1),
 		Run:  runner.run,
 	}
+	cmd.Flags().BoolP("force", "f", false, "Remove without confirmation prompt")
+	return cmd
 }
 
 func init() {

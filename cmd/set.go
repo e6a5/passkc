@@ -23,9 +23,11 @@ package cmd
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 
+	"github.com/e6a5/passkc/kc"
 	"github.com/spf13/cobra"
 )
 
@@ -38,67 +40,165 @@ func (r *setCmdRunner) run(cmd *cobra.Command, args []string) {
 	quiet, _ := cmd.Flags().GetBool("quiet")
 
 	if filePath != "" {
-		// Read credentials from file
-		file, err := os.Open(filePath)
-		if err != nil {
-			cmd.PrintErrf("Error opening file: %v\n", err)
-			os.Exit(1)
-		}
-		defer file.Close()
+		r.handleFileInput(cmd, filePath, quiet)
+		return
+	}
 
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			parts := strings.Fields(scanner.Text())
-			if len(parts) >= 2 {
-				domain := parts[0]
-				username := parts[1]
-				password := ""
-				if len(parts) > 2 {
-					password = parts[2]
-				}
-				if err := r.kcManager.SetData(domain, username, password); err != nil {
-					cmd.PrintErrf("Error setting credentials for %s: %v\n", domain, err)
-				} else if !quiet {
-					cmd.Printf("Saved credentials for %s\n", domain)
-				}
-			}
+	if len(args) >= 2 {
+		r.handleDirectInput(cmd, args[0], args[1], quiet)
+		return
+	}
+
+	if len(args) == 1 {
+		r.handleInteractiveInput(cmd, args[0], quiet)
+		return
+	}
+
+	// No arguments provided - try stdin or show usage
+	if r.hasStdinInput() {
+		r.handleStdinInput(cmd, quiet)
+		return
+	}
+
+	// Show helpful usage message
+	cmd.PrintErrf("Usage: passkc set <domain> [username]\n\n")
+	cmd.PrintErrf("Examples:\n")
+	cmd.PrintErrf("  passkc set github.com                    # Interactive username/password prompt\n")
+	cmd.PrintErrf("  passkc set github.com myusername         # Password prompt only\n")
+	cmd.PrintErrf("  passkc set -f credentials.txt            # Import from file\n")
+	cmd.PrintErrf("\nFor more help: passkc set --help\n")
+	os.Exit(1)
+}
+
+func (r *setCmdRunner) handleDirectInput(cmd *cobra.Command, domain, username string, quiet bool) {
+	// Validate inputs
+	if err := kc.ValidateDomain(domain); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	if err := kc.ValidateUsername(username); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := r.kcManager.SetData(domain, username, ""); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !quiet {
+		cmd.Printf("✓ Saved credentials for %s@%s\n", username, domain)
+	}
+}
+
+func (r *setCmdRunner) handleInteractiveInput(cmd *cobra.Command, domain string, quiet bool) {
+	// Validate domain
+	if err := kc.ValidateDomain(domain); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Interactive username prompt
+	fmt.Printf("Username for %s: ", domain)
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		cmd.PrintErrf("Error: failed to read username\n")
+		os.Exit(1)
+	}
+
+	username := strings.TrimSpace(scanner.Text())
+	if err := kc.ValidateUsername(username); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := r.kcManager.SetData(domain, username, ""); err != nil {
+		cmd.PrintErrf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !quiet {
+		cmd.Printf("✓ Saved credentials for %s@%s\n", username, domain)
+	}
+}
+
+func (r *setCmdRunner) handleFileInput(cmd *cobra.Command, filePath string, quiet bool) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		cmd.PrintErrf("Error: cannot open file '%s': %v\n", filePath, err)
+		os.Exit(1)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+	successCount := 0
+
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
 		}
-	} else if len(args) == 2 {
-		// Set credentials from command line arguments
-		domain := args[0]
-		username := args[1]
-		if err := r.kcManager.SetData(domain, username, ""); err != nil {
-			cmd.PrintErrf("Error: %v\n", err)
-			os.Exit(1)
+
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			cmd.PrintErrf("Warning: skipping line %d (invalid format): %s\n", lineNum, line)
+			continue
 		}
-		if !quiet {
-			cmd.Println("Saved successfully")
+
+		domain := parts[0]
+		username := parts[1]
+		password := ""
+		if len(parts) > 2 {
+			password = parts[2]
 		}
-	} else {
-		// Read from stdin
-		scanner := bufio.NewScanner(os.Stdin)
-		if scanner.Scan() {
-			parts := strings.Fields(scanner.Text())
-			if len(parts) >= 2 {
-				domain := parts[0]
-				username := parts[1]
-				password := ""
-				if len(parts) > 2 {
-					password = parts[2]
-				}
-				if err := r.kcManager.SetData(domain, username, password); err != nil {
-					cmd.PrintErrf("Error: %v\n", err)
-					os.Exit(1)
-				}
-				if !quiet {
-					cmd.Println("Saved successfully")
-				}
-			} else {
-				cmd.PrintErrf("Error: invalid input format\n")
-				os.Exit(1)
+
+		if err := r.kcManager.SetData(domain, username, password); err != nil {
+			cmd.PrintErrf("Error on line %d: failed to save %s: %v\n", lineNum, domain, err)
+		} else {
+			successCount++
+			if !quiet {
+				cmd.Printf("✓ Saved credentials for %s@%s\n", username, domain)
 			}
 		}
 	}
+
+	if !quiet {
+		cmd.Printf("\nImported %d credentials successfully\n", successCount)
+	}
+}
+
+func (r *setCmdRunner) handleStdinInput(cmd *cobra.Command, quiet bool) {
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		parts := strings.Fields(scanner.Text())
+		if len(parts) >= 2 {
+			domain := parts[0]
+			username := parts[1]
+			password := ""
+			if len(parts) > 2 {
+				password = parts[2]
+			}
+			if err := r.kcManager.SetData(domain, username, password); err != nil {
+				cmd.PrintErrf("Error: %v\n", err)
+				os.Exit(1)
+			}
+			if !quiet {
+				cmd.Printf("✓ Saved credentials for %s@%s\n", username, domain)
+			}
+		} else {
+			cmd.PrintErrf("Error: invalid input format. Expected: domain username [password]\n")
+			os.Exit(1)
+		}
+	}
+}
+
+func (r *setCmdRunner) hasStdinInput() bool {
+	stat, _ := os.Stdin.Stat()
+	return (stat.Mode() & os.ModeCharDevice) == 0
 }
 
 func newSetCmd(kcManager KeychainManager) *cobra.Command {
@@ -106,27 +206,26 @@ func newSetCmd(kcManager KeychainManager) *cobra.Command {
 		kcManager: kcManager,
 	}
 	cmd := &cobra.Command{
-		Use:   "set [domain] [username]",
-		Short: "Store credentials for a domain in the Keychain",
-		Long: `The passkc set command stores credentials for a domain in the Keychain.
-It supports input from file and stdin.
+		Use:   "set <domain> [username]",
+		Short: "Save credentials for a website or service",
+		Long: `Save your username and password for a domain.
+
+If you only provide the domain, you'll be prompted for the username.
+You'll always be prompted for the password (for security).
 
 Examples:
-  # Set credentials interactively
-  passkc set domain.com username
+  passkc set github.com                    # Interactive: prompts for username and password
+  passkc set github.com myusername         # Prompts for password only
+  passkc set -f credentials.txt            # Import multiple credentials from file
 
-  # Set credentials from file
-  passkc set -f credentials.txt
-
-  # Set credentials from stdin
-  echo "domain.com username password" | passkc set
-
-  # Set credentials in quiet mode
-  passkc set domain.com username -q`,
-		Args: cobra.MaximumNArgs(2),
+File format (one per line):
+  domain username [password]
+  github.com user1 pass123
+  google.com user2`,
+		Args: cobra.RangeArgs(0, 2),
 		Run:  runner.run,
 	}
-	cmd.Flags().StringP("file", "f", "", "Read credentials from file")
+	cmd.Flags().StringP("file", "f", "", "Import credentials from file")
 	return cmd
 }
 

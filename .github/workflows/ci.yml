@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+        cache-dependency-path: go.sum
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Run tests
+      run: go test -v -race -coverprofile=coverage.out ./...
+
+    - name: Check formatting
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "The following files are not formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Run vet
+      run: go vet ./...
+
+    - name: Install golangci-lint
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+    - name: Run golangci-lint
+      run: golangci-lint run
+
+  security:
+    name: Security Scan
+    runs-on: macos-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: './...' 
